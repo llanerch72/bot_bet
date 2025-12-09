@@ -33,8 +33,14 @@ source venv/bin/activate
 echo "[REMOTE] Instalando dependencias..."
 pip install -r requirements.txt
 
-echo "[REMOTE] Ejecutando python main.py para prueba..."
-python main.py
+# --- Lanzar el bot en tmux como daemon ---
+if tmux has-session -t botbet 2>/dev/null; then
+  echo "[REMOTE] Matando sesión tmux existente 'botbet'..."
+  tmux kill-session -t botbet
+fi
 
-echo "[REMOTE] Deploy OK ✅"
+echo "[REMOTE] Lanzando nueva sesión tmux 'botbet'..."
+tmux new-session -d -s botbet "cd $REMOTE_DIR && source venv/bin/activate && python main.py"
+
+echo "[REMOTE] Deploy OK ✅ (bot ejecutándose en tmux 'botbet')"
 EOF2
