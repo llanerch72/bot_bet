@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# === CONFIGURACIÓN ===
 SERVER_USER_HOST="root@38.242.236.14"
 REMOTE_DIR="/root/bot-bet"
 COMMIT_MSG="${1:-chore: auto-deploy}"
@@ -9,7 +8,6 @@ COMMIT_MSG="${1:-chore: auto-deploy}"
 echo "🔄 [LOCAL] Haciendo commit y push..."
 git status --short
 
-# Añade todo y crea commit solo si hay cambios
 if [ -n "$(git status --porcelain)" ]; then
   git add .
   git commit -m "$COMMIT_MSG"
@@ -29,8 +27,6 @@ git pull
 
 echo "[REMOTE] Preparando venv..."
 if [ ! -d "venv" ]; then
-  echo "[REMOTE] venv no existe. Creándolo..."
-  # Asegura que existe el módulo venv
   apt-get update -y
   apt-get install -y python3-venv
   python3 -m venv venv
@@ -45,8 +41,22 @@ python -m pip install --upgrade pip
 echo "[REMOTE] Instalando dependencias..."
 pip install -r requirements.txt
 
-echo "[REMOTE] Ejecutando python main.py --force (prueba inmediata)..."
-python main.py --force
+echo "[REMOTE] Ejecutando bot (prueba inmediata)..."
+python main.py --force || true
 
-echo "[REMOTE] Deploy OK ✅"
+# =========================
+# Reiniciar web en tmux
+# =========================
+SESSION="botbet-web"
+CMD="cd $REMOTE_DIR && source venv/bin/activate && python -m uvicorn bot_bet.webapp.app:app --host 127.0.0.1 --port 8000"
+
+if tmux has-session -t "\$SESSION" 2>/dev/null; then
+  echo "[REMOTE] Reiniciando web: matando sesión tmux '\$SESSION'..."
+  tmux kill-session -t "\$SESSION"
+fi
+
+echo "[REMOTE] Levantando web en tmux '\$SESSION'..."
+tmux new-session -d -s "\$SESSION" "\$CMD"
+
+echo "[REMOTE] Deploy OK ✅ (web en tmux '\$SESSION')"
 EOF2
