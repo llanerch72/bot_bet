@@ -27,8 +27,20 @@ cd "$REMOTE_DIR"
 echo "[REMOTE] git pull..."
 git pull
 
+echo "[REMOTE] Preparando venv..."
+if [ ! -d "venv" ]; then
+  echo "[REMOTE] venv no existe. Creándolo..."
+  # Asegura que existe el módulo venv
+  apt-get update -y
+  apt-get install -y python3-venv
+  python3 -m venv venv
+fi
+
 echo "[REMOTE] Activando venv..."
 source venv/bin/activate
+
+echo "[REMOTE] Upgrading pip..."
+python -m pip install --upgrade pip
 
 echo "[REMOTE] Instalando dependencias..."
 pip install -r requirements.txt
