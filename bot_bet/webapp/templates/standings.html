@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Clasificación LaLiga{% endblock %}
+
+{% block content %}
+<h1>Clasificación LaLiga</h1>
+
+<table class="standings-table">
+    <caption>Temporada actual</caption>
+    <thead>
+        <tr>
+            <th>Pos</th>
+            <th>Equipo</th>
+            <th>PJ</th>
+            <th>G</th>
+            <th>E</th>
+            <th>P</th>
+            <th>GF</th>
+            <th>GC</th>
+            <th>Pts</th>
+            <th>Forma</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in table %}
+        <tr>
+            <td>{{ t.rank }}</td>
+            <td>{{ t.team.name }}</td>
+            <td>{{ t.all.played }}</td>
+            <td>{{ t.all.win }}</td>
+            <td>{{ t.all.draw }}</td>
+            <td>{{ t.all.lose }}</td>
+            <td>{{ t.all.goals.for }}</td>
+            <td>{{ t.all.goals.against }}</td>
+            <td>{{ t.points }}</td>
+            <td>{{ t.form }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

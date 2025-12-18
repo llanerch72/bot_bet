@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Bot-Bet{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="/" class="nav-item">🏠 Inicio</a>
+      <a href="/stats" class="nav-item">📊 Estadísticas</a>
+      <a href="/standings" class="nav-item">📈 Clasificación</a>
+      <a href="/form" class="nav-item">🧮 Forma reciente</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

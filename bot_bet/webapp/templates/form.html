@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Forma reciente de equipos{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>📅 Forma reciente de equipos</h1>
+
+  <form method="get" action="/form" class="toolbar">
+    <label for="team">Equipo:</label>
+    <select name="team" id="team" onchange="this.form.submit()">
+      <option value="">-- Selecciona un equipo --</option>
+      {% for name in teams %}
+        <option value="{{ name }}" {% if name == selected_team %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% if error %}
+    <p class="muted">⚠️ Error: {{ error }}</p>
+  {% endif %}
+
+  {% if matches %}
+    <div class="card" style="margin-top: 20px;">
+      <h2>Últimos partidos de {{ selected_team }}</h2>
+      <ul>
+        {% for m in matches %}
+          <li>
+            {{ m.fixture.date[:10] }} —
+            {% if m.teams.home.name == selected_team %}
+              <strong>(Local)</strong> {{ m.teams.home.name }} {{ m.goals.home }} - {{ m.goals.away }} {{ m.teams.away.name }}
+            {% else %}
+              <strong>(Visita)</strong> {{ m.teams.home.name }} {{ m.goals.home }} - {{ m.goals.away }} {{ m.teams.away.name }}
+            {% endif %}
+
+            {% if m.yellow_cards or m.red_cards %}
+              —
+              {% if m.yellow_cards %}🟨 {{ m.yellow_cards }}{% endif %}
+              {% if m.red_cards %} 🟥 {{ m.red_cards }}{% endif %}
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if summary %}
+    <div class="card" style="margin-top: 20px;">
+      <h2>Resumen</h2>
+      <ul>
+        <li>⚽ Goles a favor: <strong>{{ summary.gf }}</strong></li>
+        <li>🥅 Goles en contra: <strong>{{ summary.ga }}</strong></li>
+        <li>🟨 Tarjetas amarillas: <strong>{{ summary.yellow_cards }}</strong></li>
+        <li>🟥 Tarjetas rojas: <strong>{{ summary.red_cards }}</strong></li>
+      </ul>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

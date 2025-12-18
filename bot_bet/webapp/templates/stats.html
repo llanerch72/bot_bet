@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Estadísticas del bot{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <h1>📊 Estadísticas del bot</h1>
+
+  <div class="card">
+    <p>Total días con predicción: {{ stats.total_days }}</p>
+    <p>Días con payload válido: {{ stats.days_with_payload }}</p>
+    <p>Días sin payload: {{ stats.days_without_payload }}</p>
+    <p>Total de partidos analizados: {{ stats.total_matches }}</p>
+    <p>Estrellas por tipo: ⭐ Goles {{ stats.star_type_count.goles }} · 🟨 Tarjetas {{ stats.star_type_count.tarjetas }}</p>
+    <p>Confianza media de picks estrella: {{ '%.2f' | format(stats.avg_star_confidence) }}</p>
+  </div>
+
+  <div class="card">
+    <h2>Top picks más frecuentes</h2>
+    <ul>
+      {% for pick, count in stats.top_picks %}
+        <li>{{ pick }} ({{ count }})</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Equipos más analizados</h2>
+    <ul>
+      {% for team, count in stats.top_teams %}
+        <li>{{ team }} ({{ count }})</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Tendencia últimos 30 días</h2>
+    <table class="standings-table">
+      <thead>
+        <tr>
+          <th>Día</th>
+          <th>Partidos</th>
+          <th>⭐ Goles</th>
+          <th>🟨 Tarjetas</th>
+          <th>Conf. media</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in trend_30 %}
+        <tr>
+          <td>{{ row.day }}</td>
+          <td>{{ row.matches }}</td>
+          <td>{{ row.stars_goles }}</td>
+          <td>{{ row.stars_tarjetas }}</td>
+          <td>{{ '%.2f' | format(row.avg_conf) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

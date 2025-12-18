@@ -1,31 +1,113 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>bot-bet • Pronósticos</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 24px; max-width: 1100px; }
-    .grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
-    .card { border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; background: #fff; }
-    .muted { color: #6b7280; font-size: 14px; }
-    pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 14px; line-height: 1.35; }
-    a { color: #111827; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .badge { display:inline-block; padding: 4px 10px; border-radius: 999px; background:#ecfdf5; color:#065f46; font-size:12px; font-weight:600; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-  </style>
-</head>
-<body>
-  <h1>bot-bet <span class="badge">LaLiga</span></h1>
-  <p class="muted">Pronósticos diarios guardados en SQLite.</p>
+{% extends "base.html" %}
+
+{% block title %}Pronósticos diarios{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <div class="title">bot-bet <span class="badge b-green">LaLiga</span></div>
+      <div class="muted">Pronósticos diarios (guardados en SQLite) • Acceso privado</div>
+    </div>
+
+    <div class="actions" aria-label="Acciones">
+      <span class="badge b-blue">📅 Hoy: {{ today }}</span>
+    </div>
+  </div>
 
   <div class="grid">
     <div class="card">
-      <h2>Hoy • {{ today }}</h2>
+      <h2>Pronóstico de hoy</h2>
+
       {% if today_row %}
-        <p class="muted">Guardado: {{ today_row["created_at"] }}</p>
-        <pre>{{ today_row["content"] }}</pre>
+        <div class="muted">Guardado: {{ today_row["created_at"] }}</div>
+
+        <form class="toolbar" method="get" action="/" aria-label="Filtros de pronóstico">
+          <label class="sr-only" for="type">Tipo</label>
+          <select id="type" name="type" aria-label="Tipo de estrella">
+            <option value="all" {% if pick_type == "all" %}selected{% endif %}>Todo</option>
+            <option value="goles" {% if pick_type == "goles" %}selected{% endif %}>⭐ Goles</option>
+            <option value="tarjetas" {% if pick_type == "tarjetas" %}selected{% endif %}>⭐ Tarjetas</option>
+          </select>
+
+          <label class="sr-only" for="min_conf">Confianza mínima</label>
+          <input
+            id="min_conf"
+            name="min_conf"
+            class="w-120"
+            type="number"
+            step="0.05"
+            min="0"
+            max="1"
+            value="{{ min_conf }}"
+            placeholder="0.80"
+            aria-label="Confianza mínima"
+          />
+
+          <button class="btn" type="submit" aria-label="Aplicar filtros">Filtrar</button>
+          <a class="muted" href="/" aria-label="Reset filtros">Reset</a>
+        </form>
+
+        {% if payload and payload_matches and payload_matches|length > 0 %}
+          <div class="matches">
+            {% for m in payload_matches %}
+              <div class="match-card">
+                <div class="match-head">
+                  <div class="match-title">
+                    {{ m["home"] }} – {{ m["away"] }}
+                    <span class="muted">({{ m["kickoff"] }})</span>
+                  </div>
+
+                  {% set st = m["star"] %}
+                  {% if st["type"] == "goles" %}
+                    <span class="badge b-blue">⭐ Estrella (goles) · {{ "%.2f"|format(st["confidence"]) }}</span>
+                  {% else %}
+                    <span class="badge b-green">⭐ Estrella (tarjetas) · {{ "%.2f"|format(st["confidence"]) }}</span>
+                  {% endif %}
+                </div>
+
+                <div class="row">
+                  {% set g = m["picks"]["goles"] %}
+                  <div class="pill">
+                    <strong>⚽ Goles ({{ "%.2f"|format(g["confidence"]) }})</strong>
+                    <span>{{ g["pick"] }}</span>
+                  </div>
+
+                  {% set c = m["picks"]["tarjetas"] %}
+                  <div class="pill">
+                    <strong>🟨 Tarjetas ({{ "%.2f"|format(c["confidence"]) }})</strong>
+                    <span>{{ c["pick"] if c["pick"] else "Sin pick" }}</span>
+                  </div>
+
+                  <div class="pill">
+                    <strong>⭐ Estrella</strong>
+                    <span>{{ st["pick"] }}</span>
+                  </div>
+                </div>
+
+                <details class="details">
+                  <summary class="muted">Ver desglose</summary>
+                  <div class="match-body">{{ m["picks"]["goles"]["block"] }}</div>
+                  <div class="match-body">{{ m["picks"]["tarjetas"]["block"] }}</div>
+                </details>
+              </div>
+            {% endfor %}
+          </div>
+
+        {% elif text_matches and text_matches|length > 0 %}
+          <div class="matches">
+            {% for block in text_matches %}
+              <div class="match-card">
+                <div class="match-title">{{ extract_match_title(block) }}</div>
+                <div class="match-body">{{ block }}</div>
+              </div>
+            {% endfor %}
+          </div>
+
+        {% else %}
+          <p class="muted">No hay partidos (o no hay payload) para hoy.</p>
+          <div class="match-body">{{ today_row["content"] }}</div>
+        {% endif %}
       {% else %}
         <p class="muted">Todavía no hay pronóstico guardado hoy.</p>
       {% endif %}
@@ -33,7 +115,7 @@
 
     <div class="card">
       <h3>Histórico</h3>
-      <p class="muted">Últimos {{ days|length }} días.</p>
+      <div class="muted">Últimos {{ days|length }} días</div>
       <ul>
         {% for d in days %}
           <li><a href="/day/{{ d }}">{{ d }}</a></li>
@@ -41,5 +123,5 @@
       </ul>
     </div>
   </div>
-</body>
-</html>
+</div>
+{% endblock %}

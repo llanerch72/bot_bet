@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
 from datetime import date
 from pathlib import Path
+from typing import Optional, Dict, Any, Tuple
 
-from bot_bet.predictions import build_daily_message
+from bot_bet.predictions import build_daily_message_and_payload
 from bot_bet.telegram_client import send_message_sync
 
 # =========================
@@ -40,21 +42,31 @@ def _init_db(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS predictions (
             day TEXT PRIMARY KEY,
             content TEXT NOT NULL,
+            payload_json TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
         """
     )
 
+    # Migración suave: si la tabla ya existía sin payload_json, la añadimos
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(predictions)").fetchall()]
+    if "payload_json" not in cols:
+        conn.execute("ALTER TABLE predictions ADD COLUMN payload_json TEXT")
 
-def save_prediction_to_db(day: str, content: str) -> None:
+    conn.commit()
+
+
+def save_prediction_to_db(day: str, content: str, payload: Optional[Dict[str, Any]] = None) -> None:
     DATA_DIR.mkdir(exist_ok=True)
+
+    payload_json = json.dumps(payload, ensure_ascii=False) if payload else None
 
     conn = sqlite3.connect(DB_PATH)
     try:
         _init_db(conn)
         conn.execute(
-            "INSERT OR REPLACE INTO predictions(day, content) VALUES (?, ?)",
-            (day, content),
+            "INSERT OR REPLACE INTO predictions(day, content, payload_json) VALUES (?, ?, ?)",
+            (day, content, payload_json),
         )
         conn.commit()
     finally:
@@ -71,27 +83,37 @@ def run_bot(force: bool = False) -> None:
 
     print(f"[INFO] Ejecutando bot-bet para el día {today_str} (force={force})...")
 
-    text = build_daily_message()
+    # 1) Construimos texto + payload (si payload falla, lo dejamos en None)
+    text: str
+    payload: Optional[Dict[str, Any]]
+
+    try:
+        text, payload = build_daily_message_and_payload()
+    except Exception as e:
+        print(f"[ERROR] Fallo construyendo mensaje/payload: {e}")
+        # Fallback duro: guardamos algo mínimo para no romper
+        text = f"🏆 LaLiga – Pronósticos ({today_str})\n\n⚠️ Error generando pronósticos."
+        payload = None
 
     print("\n================ MENSAJE GENERADO ================\n")
     print(text)
     print("\n==================================================\n")
 
-    # 1) Guardamos SIEMPRE en DB (aunque Telegram falle)
+    # 2) Guardamos SIEMPRE en DB (aunque Telegram falle)
     try:
-        save_prediction_to_db(today_str, text)
+        save_prediction_to_db(today_str, text, payload)
         print(f"[INFO] Guardado en DB: {DB_PATH}")
     except Exception as e:
         print(f"[ERROR] No se pudo guardar en SQLite: {e}")
 
-    # 2) Intentamos enviar a Telegram
+    # 3) Intentamos enviar a Telegram
     try:
         send_message_sync(text)
         print("[INFO] Enviado a Telegram OK")
     except Exception as e:
         print(f"[ERROR] Error enviando a Telegram: {e}")
 
-    # 3) Marcamos ejecución del día (siempre, para evitar spam)
+    # 4) Marcamos ejecución del día (siempre, para evitar spam)
     set_last_run_date(today_str)
     print(f"[INFO] Ejecución completada y marcada para {today_str}.")
 

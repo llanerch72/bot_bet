@@ -38,50 +38,52 @@ def _format_kickoff(kickoff_iso: Optional[str]) -> str:
     except Exception:
         return kickoff_iso
 
-
-def get_todays_matches() -> List[MatchDict]:
+def get_todays_matches(max_lookahead_days: int = 7) -> List[MatchDict]:
     """
-    Obtiene los partidos de LaLiga para la fecha de hoy usando API-Football.
-    Incluye también el fixture_id y el árbitro.
+    Obtiene los partidos de LaLiga para hoy.
+    Si hoy no hay partidos, busca el próximo día con partidos (hasta max_lookahead_days).
     """
-    today = date.today()
-    today_str = today.strftime("%Y-%m-%d")
+    for delta in range(0, max_lookahead_days + 1):
+        target = date.today().fromordinal(date.today().toordinal() + delta)
+        target_str = target.strftime("%Y-%m-%d")
 
-    data = api_football_get(
-        "/fixtures",
-        {
-            "league": settings.api_football_league_id,
-            "season": settings.api_football_season,
-            "date": today_str,
-        },
-    )
-
-    matches: List[MatchDict] = []
-
-    for item in data.get("response", []):
-        fixture = item.get("fixture", {}) or {}
-        teams = item.get("teams", {}) or {}
-
-        home = teams.get("home", {}) or {}
-        away = teams.get("away", {}) or {}
-
-        kickoff_iso = fixture.get("date")
-        kickoff_display = _format_kickoff(kickoff_iso)
-
-        matches.append(
+        data = api_football_get(
+            "/fixtures",
             {
-                "fixture_id": fixture.get("id"),
-                "referee": fixture.get("referee"),  # string con el nombre del árbitro
-                "home_team": home.get("name"),
-                "away_team": away.get("name"),
-                "home_team_id": home.get("id"),
-                "away_team_id": away.get("id"),
-                "kickoff": kickoff_display,
-            }
+                "league": settings.api_football_league_id,
+                "season": settings.api_football_season,
+                "date": target_str,
+            },
         )
 
-    return matches
+        matches: List[MatchDict] = []
+        for item in data.get("response", []):
+            fixture = item.get("fixture", {}) or {}
+            teams = item.get("teams", {}) or {}
 
+            home = teams.get("home", {}) or {}
+            away = teams.get("away", {}) or {}
+
+            kickoff_iso = fixture.get("date")
+            kickoff_display = _format_kickoff(kickoff_iso)
+
+            matches.append(
+                {
+                    "fixture_id": fixture.get("id"),
+                    "referee": fixture.get("referee"),
+                    "home_team": home.get("name"),
+                    "away_team": away.get("name"),
+                    "home_team_id": home.get("id"),
+                    "away_team_id": away.get("id"),
+                    "kickoff": kickoff_display,
+                    "match_date": target_str,  # 👈 extra útil para la web
+                }
+            )
+
+        if matches:
+            return matches
+
+    return []
 
 # =========================
 # 2. Bloque de pronóstico de GOLES
@@ -436,3 +438,87 @@ def build_daily_message() -> str:
         blocks.append("")  # Línea en blanco entre partidos
 
     return "\n".join(blocks).strip()
+
+# =========================
+# 6. Payload estructurado (para web/stats)
+# =========================
+
+def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
+    try:
+        v = float(x)
+    except Exception:
+        v = 0.0
+    if v < lo:
+        return lo
+    if v > hi:
+        return hi
+    return v
+
+
+def build_match_payload(match: MatchDict) -> Dict[str, Any]:
+    home = match.get("home_team")
+    away = match.get("away_team")
+    kickoff = match.get("kickoff")
+    fixture_id = match.get("fixture_id")
+    referee = match.get("referee")
+
+    goals_block, goals_pick, goals_conf = build_goals_prediction_block(match)
+    cards_block, cards_pick, cards_conf = build_cards_prediction_block(match)
+
+    goals_conf = _clamp(goals_conf)
+    cards_conf = _clamp(cards_conf)
+
+    cards_pick_str: Optional[str] = str(cards_pick) if cards_pick is not None else None
+
+    # ⭐ Star logic
+    if goals_conf >= 0.90:
+        star_type = "goles"
+        star_pick = goals_pick
+        star_conf = goals_conf
+    elif cards_pick_str is not None and cards_conf > goals_conf:
+        star_type = "tarjetas"
+        star_pick = cards_pick_str
+        star_conf = cards_conf
+    else:
+        star_type = "goles"
+        star_pick = goals_pick
+        star_conf = goals_conf
+
+    return {
+        "home": home,
+        "away": away,
+        "kickoff": kickoff,
+        "fixture_id": fixture_id,
+        "referee": referee,
+        "picks": {
+            "goles": {"pick": goals_pick, "confidence": goals_conf, "block": goals_block},
+            "tarjetas": {"pick": cards_pick_str, "confidence": cards_conf, "block": cards_block},
+        },
+        "star": {"type": star_type, "pick": star_pick, "confidence": star_conf},
+    }
+
+def build_daily_payload() -> Dict[str, Any]:
+    matches = get_todays_matches()
+    today_str = date.today().isoformat()
+
+    # Si hemos añadido match_date en cada match, tomamos la primera
+    target_day = today_str
+    if matches and isinstance(matches[0].get("match_date"), str):
+        target_day = matches[0]["match_date"]
+
+    payload_matches: List[Dict[str, Any]] = []
+    for m in matches:
+        payload_matches.append(build_match_payload(m))
+
+    return {
+        "day": today_str,          # día de ejecución
+        "target_day": target_day,  # día real con partidos
+        "league": "LaLiga",
+        "season": settings.api_football_season,
+        "matches": payload_matches,
+    }
+
+def build_daily_message_and_payload() -> Tuple[str, Dict[str, Any]]:
+    text = build_daily_message()
+    payload = build_daily_payload()
+    return text, payload

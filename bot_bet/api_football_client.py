@@ -34,3 +34,27 @@ def api_football_get(path: str, params: Optional[Dict[str, Any]] = None) -> Dict
         raise ApiFootballError(f"Respuesta inesperada de API-Football: {data}")
 
     return data
+
+def get_standings(league_id: int, season: int) -> list[dict[str, Any]]:
+    """
+    Devuelve la tabla de clasificación actual (posición, puntos, forma, etc.)
+    """
+    data = api_football_get("/standings", {"league": league_id, "season": season})
+    try:
+        standings = data["response"][0]["league"]["standings"][0]
+        return standings
+    except (KeyError, IndexError, TypeError) as e:
+        raise ApiFootballError(f"No se pudo extraer clasificación: {e}")
+
+def get_last_matches(team_id: int, season: int, league_id: int, last_n: int = 5) -> list[dict[str, Any]]:
+    """
+    Devuelve los últimos N partidos de un equipo en una liga y temporada.
+    """
+    data = api_football_get("/fixtures", {
+        "team": team_id,
+        "league": league_id,
+        "season": season,
+        "last": last_n
+    })
+
+    return data["response"]
