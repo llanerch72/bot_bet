@@ -17,10 +17,10 @@ else
 fi
 
 echo "🚀 [REMOTE] Actualizando proyecto en el servidor..."
-ssh "$SERVER_USER_HOST" << 'EOF2'
+ssh "$SERVER_USER_HOST" << EOF2
 set -e
 
-cd /root/bot-bet
+cd "$REMOTE_DIR"
 
 echo "[REMOTE] Guardando cambios locales (stash)..."
 git stash save "backup-auto-before-deploy" || true
@@ -51,7 +51,7 @@ python main.py --force || true
 # Reiniciar web en tmux
 # =========================
 SESSION="botbet-web"
-CMD="cd /root/bot-bet && source venv/bin/activate && python -m uvicorn bot_bet.webapp.app:app --host 127.0.0.1 --port 8000"
+CMD="cd $REMOTE_DIR && source venv/bin/activate && python -m uvicorn bot_bet.webapp.app:app --host 127.0.0.1 --port 8000"
 
 if tmux has-session -t "\$SESSION" 2>/dev/null; then
   echo "[REMOTE] Reiniciando web: matando sesión tmux '\$SESSION'..."
