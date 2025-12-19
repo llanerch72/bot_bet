@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SERVER_USER_HOST="root@38.242.236.14"
+SERVER_IP="38.242.236.14"
+SERVER_USER_HOST="root@$SERVER_IP"
 REMOTE_DIR="/root/bot-bet"
 COMMIT_MSG="${1:-chore: auto-deploy}"
 
@@ -63,3 +64,18 @@ tmux new-session -d -s "\$SESSION" "\$CMD"
 
 echo "[REMOTE] ✅ Deploy OK (web levantada en tmux '\$SESSION')"
 EOF2
+
+# =========================
+# Verificación final desde local
+# =========================
+echo ""
+echo "🌍 Verificando despliegue en http://$SERVER_IP ..."
+
+STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://$SERVER_IP)
+
+if [[ "$STATUS_CODE" == "200" ]]; then
+  echo "✅ ¡El servidor responde correctamente en http://$SERVER_IP"
+else
+  echo "❌ El servidor NO está respondiendo como se esperaba. Código HTTP: $STATUS_CODE"
+  echo "   Revisa los logs con: tmux attach -t botbet-web"
+fi
