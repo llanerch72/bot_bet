@@ -47,7 +47,7 @@ def get_team_players_cards_stats(
         if not stats_list:
             continue
 
-        stats = stats_list[0]
+        stats = stats_List[0]
         games = stats.get("games", {}) or {}
         cards = stats.get("cards", {}) or {}
 
